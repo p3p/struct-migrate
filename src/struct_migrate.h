@@ -147,14 +147,16 @@ constexpr uint32_t crc32Table[256] = {
 
 constexpr uint32_t crc32(const char *message) {
   int32_t i = 0, crc = 0;
-  const uint8_t *p = (uint8_t*)message;
-  while (message[i++] != 0) crc = crc32Table[(crc ^ *p++) & 0xff] ^ (crc >> 8);
+  uint8_t byte = message[i];
+  while (message[i++] != 0) {
+    crc = crc32Table[(crc ^ byte) & 0xff] ^ (crc >> 8);
+    byte = message[i];
+  }
   return crc;
 }
 constexpr uint32_t crc32(const char *message, std::size_t length) {
-  int32_t i = 0, crc = 0;
-  const uint8_t *p = (uint8_t*)message;
-  while (length--) crc = crc32Table[(crc ^ *p++) & 0xff] ^ (crc >> 8);
+  int32_t crc = 0;
+  for (std::size_t i = 0; i < length; i++) crc = crc32Table[(crc ^ message[i]) & 0xff] ^ (crc >> 8);
   return crc;
 }
 }
@@ -269,13 +271,13 @@ layout_descriptor new_layout_descriptor() {
 }
 
 template <typename T, typename Storage, std::size_t N, typename U>
-void load_layout(layout_descriptor& descriptor, U& layout) {
+void load_layout(const std::size_t offset, U& layout) {
   using Layout_N = typename select_layout<T, N>::type;
   Layout_N layout_N;
 
-  std::size_t bytes = read_struct<Storage>(descriptor.offset, &layout_N);
+  std::size_t bytes = read_struct<Storage>(offset, &layout_N);
   uint32_t stored_checksum;
-  read_struct<Storage>(descriptor.offset + bytes, &stored_checksum);
+  read_struct<Storage>(offset + bytes, &stored_checksum);
   uint32_t current_checksum = struct_checksum(layout_N);
 
   if (stored_checksum != current_checksum) {
@@ -301,7 +303,7 @@ bool load(U& layout) {
     return false;
   }
   vittorioromeo::repeat<U::version>([&layout_desc, &layout](auto i) {
-    if (i + 1 == layout_desc.version) { load_layout<T, Storage, i + 1>(layout_desc, layout); return; }
+    if (i + 1 == layout_desc.version) { load_layout<T, Storage, i + 1>(layout_desc.offset, layout); return; }
   });
   return true;
 }
