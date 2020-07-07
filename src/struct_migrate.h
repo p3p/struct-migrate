@@ -23,19 +23,16 @@
 #pragma once
 
 #include <cstdint>
-#include <cstring>
 #include <utility>
 
-#include <iostream>
-
-namespace struct_store_migrate {
+namespace struct_migrate {
 
 /******************* Compile time repeat with numberic iteration value <source: https://vittorioromeo.info/> ******************************/
 namespace vittorioromeo {
 namespace detail {
-    template <auto... Is> struct seq_type_impl : std::common_type<decltype(Is)...> {};
-    template <>           struct seq_type_impl<> { using type = int; };
-    template <auto... Is> using seq_type = typename seq_type_impl<Is...>::type;
+  template <auto... Is> struct seq_type_impl : std::common_type<decltype(Is)...> {};
+  template <>           struct seq_type_impl<> { using type = int; };
+  template <auto... Is> using seq_type = typename seq_type_impl<Is...>::type;
 }
 
 template <auto... Is> using sequence      = std::integer_sequence<detail::seq_type<Is...>, Is...>;
@@ -43,14 +40,14 @@ template <auto I>     using constant      = std::integral_constant<decltype(I), 
 template <auto I>     using make_sequence = std::make_integer_sequence<decltype(I), I>;
 
 namespace detail {
-    template <typename F, auto... Is>
-    void repeat_impl(F&& f, sequence<Is...>) {
-        if constexpr((std::is_invocable_v<F&&, constant<Is>> && ...)) {
-            ( f(constant<Is>{}), ... );
-        } else {
-            ( ((void)Is, f()), ... );
-        }
+  template <typename F, auto... Is>
+  void repeat_impl(F&& f, sequence<Is...>) {
+    if constexpr((std::is_invocable_v<F&&, constant<Is>> && ...)) {
+      ( f(constant<Is>{}), ... );
+    } else {
+      ( ((void)Is, f()), ... );
     }
+  }
 }
 
 template <auto N, typename F> void repeat(F&& f) { detail::repeat_impl(f, make_sequence<N>{}); }
@@ -69,11 +66,11 @@ template <typename T> struct select_layout<T, 1> { using type = typename T::Layo
 
 template <typename T, typename U>
 void migrate_to(T layout, U& target ) {
-    if constexpr (can_migrate<T>() && !std::is_same<T, U>::value ) {
-      migrate_to(layout.migrate(), target);
-    } else {
-      target = layout;
-    }
+  if constexpr (can_migrate<T>() && !std::is_same<T, U>::value ) {
+    migrate_to(layout.migrate(), target);
+  } else {
+    target = layout;
+  }
 }
 
 //  Compile time hashing implementation
@@ -281,16 +278,16 @@ void load_layout(const std::size_t offset, U& layout) {
   uint32_t current_checksum = struct_checksum(layout_N);
 
   if (stored_checksum != current_checksum) {
-    std::cout << "Checksum mismatch loading defaults for struct version(" << N << ")\n";
+    //std::cout << "Checksum mismatch loading defaults for struct version(" << N << ")\n";
     layout_N = Layout_N{};
   }
 
   if constexpr (Layout_N::version != U::version) {
     migrate_to(layout_N, layout);
-    std::cout << "Migrated struct from version(" << layout_N.version << ") to version(" << layout.version << ")\n";
+    //std::cout << "Migrated struct from version(" << layout_N.version << ") to version(" << layout.version << ")\n";
   } else {
     layout = layout_N;
-    std::cout << "Loaded " << typeid(T).name() <<" version(" << layout.version << ")\n";
+    //std::cout << "Loaded " << typeid(T).name() <<" version(" << layout.version << ")\n";
   }
 }
 
@@ -298,7 +295,7 @@ template <typename Storage, typename T, typename U>
 bool load(U& layout) {
   auto layout_desc = read_layout_descriptor<T, Storage>();
   if (layout_desc.version <= 0 || layout_desc.version > U::version) {
-    std::cout << "Failed to migrate from version(" << layout_desc.version << "), loaded defaults\n";
+    //std::cout << "Failed to migrate from version(" << layout_desc.version << "), loaded defaults\n";
     layout = U{}; //default initialise
     return false;
   }
@@ -313,9 +310,9 @@ bool save(U& layout) {
   auto layout_desc = read_layout_descriptor<T, Storage>();
   layout_header header{static_cast<uint32_t>(constexpr_hash<T>), static_cast<uint16_t>(U::version), static_cast<uint16_t>(sizeof(U))};
 
-  std::cout << "Saving " << typeid(T).name() << " version(" << layout.version << ")\n";
+  //std::cout << "Saving " << typeid(T).name() << " version(" << layout.version << ")\n";
   if (!(layout_desc.version == 0 || layout_desc.size == header.size)) {
-    std::cout << "Saving " << typeid(T).name() <<" version(" << U::version << ") to a version(" << layout_desc.version << ") slot, size mismatch, Resizing\n";
+    //std::cout << "Saving " << typeid(T).name() <<" version(" << U::version << ") to a version(" << layout_desc.version << ") slot, size mismatch, Resizing\n";
     storage_resize_block<Storage>(layout_desc.offset, layout_desc.size,  header.size, new_layout_descriptor<Storage>().offset);
   }
 
@@ -324,11 +321,11 @@ bool save(U& layout) {
   uint32_t checksum = struct_checksum(layout);
   bytes += write_struct<Storage>(layout_desc.offset + bytes, &checksum);
   if (layout_desc.version == 0) {
-    std::cout << "Creating new block for " << typeid(T).name() <<" version(" << U::version << ")\n";
+    //std::cout << "Creating new block for " << typeid(T).name() <<" version(" << U::version << ")\n";
     layout_header terminator{};
     write_struct<Storage>(layout_desc.offset + bytes, &terminator); // write the "null termination" of the linked list
   }
   return true;
 }
 
-} // namespace struct_store_migrate
+} // namespace struct_migrate

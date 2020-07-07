@@ -1,5 +1,6 @@
 #include "struct_migrate.h"
 
+#include <cstring>
 #include <cstdint>
 #include <iostream>
 #include <fstream>
@@ -12,10 +13,10 @@ namespace test_storage_ram {
 [[gnu::aligned(4)]] char memory[storage_size]{}; // storage initialised constand [0xAB, 0xCD] and version 1 [0x01, 0x00]
 struct StorageMedium {
   static bool init() {
-    struct_store_migrate::storage_header header{0xCDAB, 1};
+    struct_migrate::storage_header header{0xCDAB, 1};
     write(0, (char *)&header, sizeof(header));
-    struct_store_migrate::layout_header lheader{};
-    write(sizeof(struct_store_migrate::storage_header), (char *)&lheader, sizeof(lheader));
+    struct_migrate::layout_header lheader{};
+    write(sizeof(struct_migrate::storage_header), (char *)&lheader, sizeof(lheader));
     return true; // cant go wrong, right?
   }
   static void read(std::size_t offset, char* buffer, const std::size_t size) {
@@ -41,9 +42,9 @@ struct StorageMedium {
         file_memory.write("\377", 1);
       }
       file_memory.seekp(0, std::ios::beg);
-      struct_store_migrate::storage_header header{0xCDAB, 1};
+      struct_migrate::storage_header header{0xCDAB, 1};
       file_memory.write((char *)&header, sizeof(header));
-      struct_store_migrate::layout_header lheader{};
+      struct_migrate::layout_header lheader{};
       file_memory.write((char *)&lheader, sizeof(lheader));
       file_memory.seekp(0, std::ios::beg);
       file_memory.flush();
@@ -69,16 +70,14 @@ using namespace test_storage_file;
 // helper function to save "T::Config config" properties
 template <typename T>
 inline bool save_config(T& feature) {
-  return struct_store_migrate::save<StorageMedium, typename T::Config>(feature.config);
+  return struct_migrate::save<StorageMedium, typename T::Config>(feature.config);
 }
 
 // helper function to load "T::Config config" properties
 template <typename T>
 inline bool load_config(T* feature) {
-  return struct_store_migrate::load<StorageMedium, typename T::Config>(feature->config);
+  return struct_migrate::load<StorageMedium, typename T::Config>(feature->config);
 }
-
-
 
 class FeatureFour {
 public:
@@ -232,7 +231,7 @@ int main() {
   *  Save old version and try a default load
   */
   Feature::Config::Layout_2 test{};
-  struct_store_migrate::save<StorageMedium, Feature::Config>(test);
+  struct_migrate::save<StorageMedium, Feature::Config>(test);
 
   Feature feature_test;
   save_config(feature);
